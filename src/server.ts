@@ -68,22 +68,18 @@ export class CcxtMcpServer {
       version: "4.0.0",
     });
 
-    // 설정 파일 경로 설정
-    this.configPath =
-      configPath ||
-      path.join(
-        os.homedir(),
-        ".config",
-        "Claude",
-        "claude_desktop_config.json",
-      );
+    // Determine config file path: prefer provided path, otherwise use project 'config/ccxt-accounts.json'
+    if (configPath && typeof configPath === "string") {
+      this.configPath = configPath;
+    } else {
+      // Use a config path relative to the current working directory when no explicit path is provided
+      this.configPath = path.resolve(process.cwd(), "config", "ccxt-accounts.json");
+    }
 
-    // 설정 파일에서 계정 로드 및 거래소 인스턴스 초기화
-    this.loadAccountsFromConfig();
+    console.error(`[INFO] Using config file: ${this.configPath}`);
 
-    // 리소스 및 도구 등록
-    this.registerResources();
-    this.registerTools();
+    // IMPORTANT: do NOT load accounts or register resources/tools in the constructor because
+    // loading requires async operations. Loading and registration will be performed in start().
   }
 
   /**
@@ -99,6 +95,28 @@ export class CcxtMcpServer {
         return;
       }
       
+      // Default configuration for Binance
+      const defaultConfig = {
+        binance: {
+          urls: {
+            api: {
+              public: 'https://api.binance.com',
+              private: 'https://api.binance.com',
+              ws: 'wss://stream.binance.com:9443/ws'
+            }
+          },
+          options: {
+            defaultType: 'spot',
+            adjustForTimeDifference: true,
+            recvWindow: 10000,
+            createMarketBuyOrderRequiresPrice: true,
+            fetchMarkets: ['spot'],
+            fetchTicker: ['spot'],
+            fetchTickers: ['spot']
+          }
+        }
+      };
+      
       const configContent = fs.readFileSync(this.configPath, "utf-8");
       console.error(`[DEBUG] Config file size: ${configContent.length} bytes`);
       
@@ -106,6 +124,22 @@ export class CcxtMcpServer {
       try {
         config = JSON.parse(configContent);
         console.error(`[DEBUG] Successfully parsed JSON config`);
+        
+        // Apply default configuration for Binance
+        if (config.accounts && Array.isArray(config.accounts)) {
+          config.accounts = config.accounts.map(account => {
+            if (account.exchangeId === 'binance') {
+              return {
+                ...account,
+                options: {
+                  ...defaultConfig.binance.options,
+                  ...(account.options || {})
+                }
+              };
+            }
+            return account;
+          });
+        }
       } catch (jsonError) {
         console.error(`[ERROR] Invalid JSON in config file: ${jsonError.message}`);
         throw new Error(
@@ -215,10 +249,12 @@ export class CcxtMcpServer {
           // Store the instance using the account name as the key
           this.exchangeInstances[account.name] = exchangeInstance;
         } catch (error) {
-          // console.error(
-          //   `Failed to create CCXT instance for account '${account.name}' (${account.exchangeId}):`,
-          //   error,
-          // );
+          console.error(
+            `Failed to create CCXT instance for account '${account.name}' (${account.exchangeId}):`,
+            error instanceof Error ? error.message : error,
+          );
+          // Continue to next account
+          continue;
         }
       }
     } catch (error) {
@@ -379,6 +415,14 @@ export class CcxtMcpServer {
    * 서버를 시작합니다.
    */
   async start() {
+    // Load accounts and initialize exchange instances before registering resources/tools
+    await this.loadAccountsFromConfig();
+
+    // Register resources and tools after accounts are loaded to ensure tools like
+    // `listAccounts` reflect the loaded accounts immediately.
+    this.registerResources();
+    this.registerTools();
+
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     console.error("CCXT MCP Server started");

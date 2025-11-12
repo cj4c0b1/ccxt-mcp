@@ -21,3 +21,7 @@
 # 테스트 결과
 /junit.xml
 /test-results/
+
+# Local config files (may contain API keys) - do not commit
+config/
+.config
