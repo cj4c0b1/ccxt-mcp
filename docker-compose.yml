@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  ccxt-mcp:
+    build: .
+    image: ccxt-mcp:local
+    volumes:
+      # Use the user's host config so edits in ~/.config/ccxt are reflected immediately
+      - /Users/cicerojacobi/.config/ccxt/ccxt-accounts.json:/app/config/ccxt-accounts.json:ro
+      # Also expose the same host file at the common XDG config path inside the container
+      - /Users/cicerojacobi/.config/ccxt/ccxt-accounts.json:/root/.config/ccxt/ccxt-accounts.json:ro
+      # Mount only the source code, not node_modules
+      - ./src:/app/src:cached
+      - ./bin:/app/bin:cached
+      - ./config:/app/config:cached
+      - ./package.json:/app/package.json:cached
+      - ./tsconfig.json:/app/tsconfig.json:cached
+    environment:
+      - NODE_ENV=development
+      - CCXT_DEFAULT_TYPE=spot
+    ports:
+      - "3000:3000"
+    command: ["npm", "run", "dev", "--", "--config", "config/ccxt-accounts.json"]
+    restart: "no"
+    stdin_open: true
+    tty: true

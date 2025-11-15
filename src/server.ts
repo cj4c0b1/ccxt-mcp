@@ -210,18 +210,49 @@ export class CcxtMcpServer {
         }
 
         try {
-          const exchangeOptions = {
+          const mergedOptions: Record<string, any> = {
+            defaultType: account.defaultType || "spot",
+            ...(account.options || {}),
+          };
+
+          const exchangeOptions: Record<string, any> = {
             apiKey: account.apiKey,
             secret: account.secret,
-            options: {
-              defaultType: account.defaultType || "spot", // Use defaultType or fallback to 'spot'
-            },
+            options: mergedOptions,
           };
+
+          const accountPassword =
+            account.password ??
+            (typeof mergedOptions.password === "string"
+              ? mergedOptions.password
+              : undefined);
+          if (accountPassword) {
+            exchangeOptions.password = accountPassword;
+            delete mergedOptions.password; // Prevent leaking password inside options
+            console.error(`[DEBUG] Password set for account '${account.name}': ${accountPassword ? 'Yes' : 'No'}`);
+          } else {
+            console.error(`[DEBUG] No password found for account '${account.name}'`);
+          }
+
+          if (account.uid) exchangeOptions.uid = account.uid;
+          if (account.privateKey) exchangeOptions.privateKey = account.privateKey;
+          if (account.walletAddress)
+            exchangeOptions.walletAddress = account.walletAddress;
+          if (account.subaccount) exchangeOptions.subaccount = account.subaccount;
+          if (typeof account.enableRateLimit === "boolean")
+            exchangeOptions.enableRateLimit = account.enableRateLimit;
+          if (typeof account.timeout === "number")
+            exchangeOptions.timeout = account.timeout;
+          if (typeof account.verbose === "boolean")
+            exchangeOptions.verbose = account.verbose;
+          if (account.proxy) exchangeOptions.proxy = account.proxy;
 
           // @ts-ignore - CCXT dynamic instantiation
           const exchangeInstance = new ccxt[account.exchangeId](
             exchangeOptions,
           );
+          
+          console.error(`[DEBUG] Created exchange instance for '${account.name}' with password: ${exchangeInstance.password ? 'Yes' : 'No'}`);
 
           // 특정 마켓 타입이 지원되는지 검증
           if (account.defaultType) {
