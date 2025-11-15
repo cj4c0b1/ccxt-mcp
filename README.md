@@ -9,6 +9,14 @@
 
 CCXT MCP Server is a server that allows AI models to interact with cryptocurrency exchange APIs through the [Model Context Protocol (MCP)](https://github.com/anthropics/anthropic-cookbook/tree/main/model-context-protocol). This server uses the [CCXT library](https://github.com/ccxt/ccxt) to provide access to more than 100 cryptocurrency exchanges and their trading capabilities.
 
+## ✨ Features
+
+- 🔄 **Built-in Caching System**: Intelligent caching with extended TTL for market data (7 days) to reduce resource consumption for AI systems
+- 📊 Access to 100+ cryptocurrency exchanges
+- 💹 Real-time market data and trading capabilities
+- 🔐 Secure credential management
+- 🛠️ Comprehensive trading tools and analysis features
+
 ## 🚀 Quick Start
 
 ```bash
@@ -295,6 +303,25 @@ npm install
 # Build
 npm run build
 ```
+
+## 🗂️ Caching System
+
+CCXT MCP Server includes a built-in caching system that stores API responses locally to improve performance and reduce API calls. See [CACHING.md](docs/CACHING.md) for detailed documentation.
+
+### Quick Cache Overview
+
+- **Automatic**: Market data is cached automatically with sensible defaults
+- **Configurable**: Set custom TTL per request
+- **Manageable**: Tools to view stats, clear cache, or cleanup expired entries
+- **Efficient**: Reduces API calls and improves response times
+
+### Cache Management Tools
+
+- `getCacheStats`: View cache statistics
+- `clearCache`: Clear all cached data
+- `cleanupCache`: Remove only expired entries
+
+See the [Caching Documentation](docs/CACHING.md) for usage examples and best practices.
 
 ## 🤝 Contributing
 

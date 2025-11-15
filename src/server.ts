@@ -23,6 +23,7 @@ import { registerMarketTools } from "./tools/market-tools.js"; // Restore .js
 import { registerOrderTools } from "./tools/order-tools.js"; // Restore .js
 import { registerAccountTools } from "./tools/account-tools.js"; // Restore .js
 import { registerAnalysisTools } from "./tools/analysis-tools.js"; // 거래 분석 도구
+import { CacheManager } from "./cache.js"; // Cache management
 
 // 설정 파일의 계정 구조 정의
 interface AccountConfig {
@@ -57,6 +58,8 @@ export class CcxtMcpServer {
   private publicExchangeInstances: Record<string, Exchange> = {};
   // 설정 파일 경로
   private configPath: string;
+  // Cache manager
+  private cacheManager: CacheManager;
 
   /**
    * @param configPath 사용자 지정 설정 파일 경로 (선택 사항)
@@ -77,6 +80,9 @@ export class CcxtMcpServer {
     }
 
     console.error(`[INFO] Using config file: ${this.configPath}`);
+
+    // Initialize cache manager with default 5-minute TTL
+    this.cacheManager = new CacheManager(undefined, 5 * 60 * 1000);
 
     // IMPORTANT: do NOT load accounts or register resources/tools in the constructor because
     // loading requires async operations. Loading and registration will be performed in start().
@@ -385,6 +391,13 @@ export class CcxtMcpServer {
     return accountNames;
   }
 
+  /**
+   * 캐시 매니저 인스턴스를 반환합니다.
+   */
+  getCacheManager(): CacheManager {
+    return this.cacheManager;
+  }
+
   getPublicExchangeInstance(
     exchangeId: string,
     marketType: "spot" | "futures" = "spot",
@@ -440,6 +453,102 @@ export class CcxtMcpServer {
     registerOrderTools(this.server, this);
     registerAccountTools(this.server, this);
     registerAnalysisTools(this.server, this);
+    this.registerCacheTools();
+  }
+
+  /**
+   * 캐시 관리 도구를 등록합니다.
+   */
+  private registerCacheTools() {
+    // Cache statistics tool
+    this.server.tool(
+      "getCacheStats",
+      "Get cache statistics including total entries, cache directory, and default TTL",
+      {},
+      async () => {
+        try {
+          const stats = this.cacheManager.getStats();
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(stats, null, 2)
+              }
+            ]
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error getting cache stats: ${(error as Error).message}`
+              }
+            ],
+            isError: true
+          };
+        }
+      }
+    );
+
+    // Clear cache tool
+    this.server.tool(
+      "clearCache",
+      "Clear all cached data",
+      {},
+      async () => {
+        try {
+          this.cacheManager.clear();
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Cache cleared successfully"
+              }
+            ]
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error clearing cache: ${(error as Error).message}`
+              }
+            ],
+            isError: true
+          };
+        }
+      }
+    );
+
+    // Cleanup expired cache entries tool
+    this.server.tool(
+      "cleanupCache",
+      "Remove expired cache entries",
+      {},
+      async () => {
+        try {
+          this.cacheManager.cleanup();
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Cache cleanup completed"
+              }
+            ]
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error cleaning up cache: ${(error as Error).message}`
+              }
+            ],
+            isError: true
+          };
+        }
+      }
+    );
   }
 
   /**
